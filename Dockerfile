@@ -1,6 +1,6 @@
 FROM golang:1.17 AS builder
-WORKDIR /app
-COPY go.mod ./
+COPY . /go/src/app
+WORKDIR /go/src/app
 RUN go mod download
 #COPY build ./
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /app cmd/main.go
