@@ -1,4 +1,4 @@
 build:
   docker:
-    app: build/Dockerfile
+    app: Dockerfile
 
