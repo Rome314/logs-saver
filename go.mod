@@ -15,7 +15,6 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/viper v1.10.1
 )
-
 require (
 	github.com/Rican7/retry v0.3.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
