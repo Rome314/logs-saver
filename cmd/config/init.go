@@ -11,7 +11,7 @@ import (
 func init() {
 	viperInit()
 	cfg = &Config{
-		ServerPort:   viper.GetString("SERVER_PORT"),
+		ServerPort:   viper.GetString("PORT"),
 		PgConnString: viper.GetString("PG_CONN_STRING"),
 		Redis: connections.RedisConfig{
 			Address:  viper.GetString("REDIS_ADDRESS"),

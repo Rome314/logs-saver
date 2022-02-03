@@ -9,5 +9,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /app cmd/main.g
 FROM alpine
 RUN apk add --no-cache tzdata
 COPY --from=builder /app ./
-EXPOSE $SERVER_PORT
+EXPOSE $PORT
 ENTRYPOINT ["./app"]
