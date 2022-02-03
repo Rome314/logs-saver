@@ -1,6 +1,7 @@
 module github.com/rome314/idkb-events
 
 go 1.17
+// +heroku goVersion go1.17
 
 require (
 	emperror.dev/emperror v0.33.0
