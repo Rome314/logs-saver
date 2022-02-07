@@ -19,7 +19,7 @@ func GetRedisPubSub(ctx context.Context, client redis.UniversalClient) (pubSub *
 	pubSubMarshaler := eventEntities.RedisMarshaller{}
 	sub, err := redisPubSub.NewSubscriber(
 		ctx,
-		redisPubSub.SubscriberConfig{Consumer: "raw_events_consumer", ConsumerGroup: "raw_events_consumer"},
+		redisPubSub.SubscriberConfig{Consumer: "raw_events_consumer_prod", ConsumerGroup: "raw_events_consumer_prod"},
 		client,
 		pubSubMarshaler,
 		nil,
