@@ -150,6 +150,11 @@ func (u *uc) clearBuffer() error {
 		u.mx.Unlock()
 	}()
 
+	if u.repo.Status() != nil {
+		logger.Warn("Pg unresponding, skipping...")
+		return nil
+	}
+
 	events, err := u.bufferRepo.PopAll()
 	if err != nil {
 		return errors.WithMessage(err, "getting events from buffer")
