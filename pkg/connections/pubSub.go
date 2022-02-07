@@ -31,7 +31,11 @@ func GetRedisPubSub(ctx context.Context, client redis.UniversalClient) (pubSub *
 
 	pub, err := redisPubSub.NewPublisher(
 		ctx,
-		redisPubSub.PublisherConfig{},
+		redisPubSub.PublisherConfig{
+			Maxlens: map[string]int64{
+				"events": 5000,
+			},
+		},
 		client,
 		pubSubMarshaler,
 		nil,

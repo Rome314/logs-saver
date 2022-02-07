@@ -11,7 +11,7 @@ import (
 )
 
 func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err error) {
-	if input.UserId == 0 {
+	if input.UserId == "" {
 		err = errors.New("user id not provided")
 		return
 	}

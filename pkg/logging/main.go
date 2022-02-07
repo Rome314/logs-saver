@@ -18,10 +18,12 @@ func (e *Entry) WithPlace(place string) *Entry {
 }
 
 func GetLogger(module, submodule string) *Entry {
-	return &Entry{Entry: logger.WithFields(log.Fields{
-		"module":    module,
-		"submodule": submodule,
-	})}
+	e := logger.WithField("module", module)
+	if submodule != "" {
+		e = e.WithField("submodule", submodule)
+	}
+
+	return &Entry{Entry: e}
 }
 
 func init() {

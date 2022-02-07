@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"time"
 
 	"emperror.dev/errors"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -12,64 +11,80 @@ import (
 	"github.com/rome314/idkb-events/pkg/logging"
 )
 
+const numWorkers = 3
+
 type uc struct {
-	logger          *logging.Entry
-	repo            eventEntities.Repository
-	sub             message.Subscriber
-	mx              sync.Mutex
-	buffer          []*eventEntities.Event
-	cfg             Config
-	autoclearTicker *time.Ticker
+	logger     *logging.Entry
+	repo       eventEntities.Repository
+	bufferRepo eventEntities.BufferRepo
+
+	sub         message.Subscriber
+	fallbackSub message.Subscriber
+
+	ipInfoProvider eventEntities.IpInfoProvider
+
+	cfg Config
+
+	clearInProgress bool
+	mx              *sync.Mutex
 }
 
-func NewUseCase(logger *logging.Entry, repo eventEntities.Repository, sub message.Subscriber, config Config) *uc {
+type CreateUseCaseInput struct {
+	Repo       eventEntities.Repository
+	BufferRepo eventEntities.BufferRepo
 
+	Sub         message.Subscriber
+	FallbackSub message.Subscriber
+
+	IpInfoProvider eventEntities.IpInfoProvider
+
+	Config Config
+}
+
+func NewUseCase(logger *logging.Entry, input CreateUseCaseInput) *uc {
 	return &uc{
-		logger:          logger,
-		repo:            repo,
-		sub:             sub,
-		mx:              sync.Mutex{},
-		buffer:          []*eventEntities.Event{},
-		cfg:             config,
-		autoclearTicker: time.NewTicker(config.BufferAutoClearDuration),
+		logger:         logger,
+		repo:           input.Repo,
+		bufferRepo:     input.BufferRepo,
+		sub:            input.Sub,
+		fallbackSub:    input.FallbackSub,
+		ipInfoProvider: input.IpInfoProvider,
+		cfg:            input.Config,
+		mx:             &sync.Mutex{},
 	}
 }
 
 func (u *uc) Run(ctx context.Context) error {
-	messages, err := u.sub.Subscribe(ctx, u.cfg.EventsTopic)
-	if err != nil {
-		return errors.WithMessage(err, "subscribing to messages")
-	}
 
-	go u.listener(ctx, messages)
+	for i := 0; i < numWorkers; i++ {
+		messages, err := u.sub.Subscribe(ctx, u.cfg.EventsTopic)
+		if err != nil {
+			return errors.WithMessage(err, "subscribing to topic")
+		}
+		fallbackMessage, err := u.fallbackSub.Subscribe(ctx, u.cfg.EventsTopic)
+		if err != nil {
+			return errors.WithMessage(err, "subscribing to fallback topic")
+		}
+		go u.listener(ctx, messages, fallbackMessage)
+	}
 	return nil
 }
 
-func (u *uc) listener(ctx context.Context, msgs <-chan *message.Message) {
-	logger := u.logger.WithMethod("listener")
+func (u *uc) listener(ctx context.Context, msgs, fbMsgs <-chan *message.Message) {
+	// logger := u.logger.WithMethod("listener")
 	for {
 		select {
 		case _ = <-ctx.Done():
-			u.autoclearTicker.Stop()
 			return
 		case msg := <-msgs:
 			u.handleMessage(msg)
-		case _ = <-u.autoclearTicker.C:
-			u.mx.Lock()
-			logger.WithPlace("autoclear").Info("Autoclear time reached")
-			err := u.clearBuffer()
-			if err != nil {
-				logger.WithPlace("autoclear").Error(err)
-			}
-			u.mx.Unlock()
+		case msg := <-fbMsgs:
+			u.handleMessage(msg)
 		}
 	}
 }
 
 func (u *uc) handleMessage(msg *message.Message) {
-	u.mx.Lock()
-	defer u.mx.Unlock()
-
 	logger := u.logger.WithMethod("handleMessage")
 
 	rawEvent := eventEntities.RawEvent{}
@@ -87,52 +102,78 @@ func (u *uc) handleMessage(msg *message.Message) {
 		return
 	}
 
-	u.buffer = append(u.buffer, event)
-	u.resetAutoclearTicker()
-	if len(u.buffer) < u.cfg.BufferSize {
-		msg.Ack()
-		return
+	ipInfo, err := u.ipInfoProvider.GetIpInfo(event.Ip.String())
+	if err != nil {
+		logger.WithPlace("get_ip_info").Error(err)
 	}
 
-	logger.Info("Buffer max len reached")
-	err = u.clearBuffer()
+	event.IpInfo = ipInfo
+
+	if err = u.bufferRepo.Status(); err != nil {
+		logger.WithPlace("insert_event").Warn("buffer is off, inserting to pg...")
+		e := u.repo.Store(event)
+		if e != nil {
+			logger.WithPlace("insert_event").Error(e)
+			msg.Nack()
+			return
+		}
+	}
+
+	bufferSize, err := u.bufferRepo.Store(event)
 	if err != nil {
-		logger.WithPlace("clearBuffer").Error(err)
+		logger.WithPlace("insert_event").Warnf("error inserting to buffer (%s), insert to pg... ", err.Error())
+		e := u.repo.Store(event)
+		if e != nil {
+			msg.Nack()
+			return
+		}
 	}
 	msg.Ack()
-
+	if bufferSize >= u.cfg.BufferSize && !u.clearInProgress {
+		err = u.clearBuffer()
+		if err != nil {
+			logger.WithPlace("clearBuffer").Error(err)
+		}
+	}
 	return
 
 }
 
-func (u *uc) resetAutoclearTicker() {
-	u.autoclearTicker.Reset(u.cfg.BufferAutoClearDuration)
-}
-
 func (u *uc) clearBuffer() error {
+	u.mx.Lock()
+	u.clearInProgress = true
 	logger := u.logger.WithMethod("clearBuffer")
-	defer u.resetAutoclearTicker()
 	logger.Info("Starting...")
 	defer logger.Info("Finish...")
+	defer func() {
+		u.clearInProgress = false
+		u.mx.Unlock()
+	}()
 
-	bufferLen := int64(len(u.buffer))
-	if bufferLen == 0 {
-		logger.Info("buffer is empty, nothing to insert")
-		return nil
-	}
-	logger.Infof("current buffer len: %d cap %d", len(u.buffer), cap(u.buffer))
-	stored, err := u.repo.StoreMany(u.buffer...)
+	events, err := u.bufferRepo.PopAll()
 	if err != nil {
-		return errors.WithMessage(err, "storing into db")
+		return errors.WithMessage(err, "getting events from buffer")
 	}
+	logger.Infof("Poped %d events from buffer", len(events))
 
-	if stored == 0 {
-		return errors.New("nothing stored")
+	logger = logger.WithPlace("insert_to_db")
+	inserted, err := u.repo.StoreMany(events...)
+	if err != nil {
+		logger.Warnf("error occured return events to buffer")
+		if e := u.bufferRepo.StoreToErrorStorage(events); e != nil {
+			logger.Errorf("insert to errors buffer: %s", e.Error())
+		}
+		return errors.WithMessage(err, "inserting events to main db")
 	}
+	logger.Infof("inserted %d events", inserted)
 
-	if stored < bufferLen {
-		logger.Warnf("could store %d/%d events", stored, bufferLen)
+	if inserted == 0 {
+		logger.Warnf("0 events inserted, return events to buffer")
+		if e := u.bufferRepo.StoreToErrorStorage(events); e != nil {
+			logger.Errorf("insert to errors buffer: %s", e.Error())
+
+		}
+
 	}
-	u.buffer = u.buffer[:0]
 	return nil
 }

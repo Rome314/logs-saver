@@ -11,13 +11,14 @@ import (
 )
 
 type delivery struct {
-	publisher message.Publisher
-	topic     string
-	logger    *logging.Entry
+	publisher         message.Publisher
+	fallBackPublisher message.Publisher
+	topic             string
+	logger            *logging.Entry
 }
 
-func NewGinDelivery(logger *logging.Entry, publisher message.Publisher, topic string) *delivery {
-	return &delivery{logger: logger, publisher: publisher, topic: topic}
+func NewGinDelivery(logger *logging.Entry, publisher, fallBackPublisher message.Publisher, topic string) *delivery {
+	return &delivery{logger: logger, publisher: publisher, fallBackPublisher: fallBackPublisher, topic: topic}
 }
 
 func (d *delivery) SetEndpoints(group *gin.RouterGroup) {
@@ -25,6 +26,7 @@ func (d *delivery) SetEndpoints(group *gin.RouterGroup) {
 }
 
 func (d *delivery) handleEvent(ctx *gin.Context) {
+
 	logger := d.logger.WithMethod("handleEvent")
 	defer func() {
 		conn, _, _ := ctx.Writer.Hijack()
@@ -44,6 +46,7 @@ func (d *delivery) handleEvent(ctx *gin.Context) {
 
 	if err := d.publisher.Publish(d.topic, msg); err != nil {
 		logger.WithPlace("publish_message").Error(err)
+		d.fallBackPublisher.Publish(d.topic, msg)
 	}
 	return
 
