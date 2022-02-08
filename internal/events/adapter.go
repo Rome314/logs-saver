@@ -50,7 +50,7 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 		return
 	}
 
-	requestTime := time.Unix(input.RequestTime, 0)
+	requestTime := time.UnixMicro(input.RequestTime)
 	if requestTime.IsZero() {
 		err = errors.New("invalid request time provided")
 		return
