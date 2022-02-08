@@ -2,6 +2,7 @@ package eventsWeb
 
 import (
 	"encoding/json"
+	"net/http"
 
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -28,16 +29,13 @@ func (d *delivery) SetEndpoints(group *gin.RouterGroup) {
 func (d *delivery) handleEvent(ctx *gin.Context) {
 
 	logger := d.logger.WithMethod("handleEvent")
-	defer func() {
-		conn, _, _ := ctx.Writer.Hijack()
-		conn.Close()
-		ctx.Abort()
-	}()
 
 	input := eventEntities.RawEvent{}
 
 	if err := ctx.ShouldBindJSON(&input); err != nil {
+
 		logger.WithPlace("read_request").Error(input)
+		ctx.Status(http.StatusBadRequest)
 		return
 	}
 
@@ -48,6 +46,7 @@ func (d *delivery) handleEvent(ctx *gin.Context) {
 		logger.WithPlace("publish_message").Error(err)
 		d.fallBackPublisher.Publish(d.topic, msg)
 	}
+	ctx.Status(http.StatusOK)
 	return
 
 }
