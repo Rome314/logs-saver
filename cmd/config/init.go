@@ -20,6 +20,9 @@ func init() {
 			EventsTopic: viper.GetString("APP_EVENTS_TOPIC"),
 			BufferSize:  viper.GetUint64("APP_BUFFER_SIZE"),
 		},
+		PubSub: connections.RedisPubSubconfig{
+			ConsumerGroup: viper.GetString("PUBSUB_CONSUMER_GROUP"),
+		},
 	}
 }
 
@@ -29,6 +32,7 @@ func viperInit() {
 
 	viper.SetDefault("APP_EVENTS_TOPIC", "events")
 	viper.SetDefault("APP_BUFFER_SIZE", 500)
+	viper.SetDefault("PUBSUB_CONSUMER_GROUP", "raw_events_group")
 
 	viper.AutomaticEnv()
 

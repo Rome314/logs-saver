@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"emperror.dev/errors"
+	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/go-redis/redis/v8"
 	redisPubSub "github.com/minghsu0107/watermill-redistream/pkg/redis"
@@ -15,11 +16,15 @@ type RedisPubSub struct {
 	Sub message.Subscriber
 }
 
-func GetRedisPubSub(ctx context.Context, client redis.UniversalClient) (pubSub *RedisPubSub, err error) {
+type RedisPubSubconfig struct {
+	ConsumerGroup string
+}
+
+func GetRedisPubSub(ctx context.Context, client redis.UniversalClient, cfg RedisPubSubconfig) (pubSub *RedisPubSub, err error) {
 	pubSubMarshaler := eventEntities.RedisMarshaller{}
 	sub, err := redisPubSub.NewSubscriber(
 		ctx,
-		redisPubSub.SubscriberConfig{Consumer: "raw_events_consumer_prod", ConsumerGroup: "raw_events_consumer_prod"},
+		redisPubSub.SubscriberConfig{Consumer: watermill.NewShortUUID(), ConsumerGroup: cfg.ConsumerGroup},
 		client,
 		pubSubMarshaler,
 		nil,

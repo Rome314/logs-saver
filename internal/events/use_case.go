@@ -11,7 +11,7 @@ import (
 	"github.com/rome314/idkb-events/pkg/logging"
 )
 
-const numWorkers = 3
+const numWorkers = 5
 
 type uc struct {
 	logger     *logging.Entry
@@ -76,9 +76,17 @@ func (u *uc) listener(ctx context.Context, msgs, fbMsgs <-chan *message.Message)
 		select {
 		case _ = <-ctx.Done():
 			return
-		case msg := <-msgs:
+		case msg, ok := <-msgs:
+			if !ok {
+				u.logger.WithMethod("listener").WithPlace("default chan").Error("channel closed")
+				return
+			}
 			u.handleMessage(msg)
-		case msg := <-fbMsgs:
+		case msg, ok := <-fbMsgs:
+			if !ok {
+				u.logger.WithMethod("listener").WithPlace("fallback chan").Error("channel closed")
+				return
+			}
 			u.handleMessage(msg)
 		}
 	}

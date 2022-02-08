@@ -41,7 +41,7 @@ func main() {
 	emperror.Panic(err)
 
 	logger.Info("Configuring internal modules...")
-	redisPubSub, err := connections.GetRedisPubSub(ctx, redisConn.Connection)
+	redisPubSub, err := connections.GetRedisPubSub(ctx, redisConn.Connection, cfg.PubSub)
 	emperror.Panic(err)
 
 	channelPubSub := gochannel.NewGoChannel(gochannel.Config{}, watermill.NewStdLogger(false, false))

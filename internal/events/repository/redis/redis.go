@@ -23,21 +23,26 @@ func New(client *redis.Client) eventEntities.BufferRepo {
 
 func (r *repo) StoreToErrorStorage(events []*eventEntities.Event) (err error) {
 
-	values := make([]interface{}, len(events))
+	values := map[string]interface{}{}
 
 	wg := &sync.WaitGroup{}
 	wg.Add(len(events))
 
-	for index, event := range events {
-		go func(i int, e *eventEntities.Event) {
+	mx := &sync.Mutex{}
+
+	for _, event := range events {
+		go func(e *eventEntities.Event) {
 			defer wg.Done()
-			bts, _ := json.Marshal(e)
-			values[i] = string(bts)
-		}(index, event)
+			key, value := getKeyValue(e)
+			mx.Lock()
+			values[key] = value
+			mx.Unlock()
+
+		}(event)
 	}
 	wg.Wait()
 
-	if err = r.client.SAdd(context.TODO(), "uninserteds_buffer", values...).Err(); err != nil {
+	if err = r.client.HSet(context.TODO(), "uninserteds_buffer", values).Err(); err != nil {
 		return errors.WithMessage(err, "inserting")
 	}
 	return nil
@@ -45,7 +50,7 @@ func (r *repo) StoreToErrorStorage(events []*eventEntities.Event) (err error) {
 }
 
 func (r *repo) Count() (count uint64, err error) {
-	count, err = r.client.SCard(context.TODO(), "insert_buffer").Uint64()
+	count, err = r.client.HLen(context.TODO(), "insert_buffer").Uint64()
 	if err != nil {
 		err = errors.WithMessage(err, "getting count")
 		return
@@ -54,24 +59,26 @@ func (r *repo) Count() (count uint64, err error) {
 }
 
 func (r *repo) PopAll() (events []*eventEntities.Event, err error) {
-	count, err := r.Count()
-	if err != nil {
-		err = errors.WithMessage(err, "getting count")
-		return
-	}
+	// count, err := r.Count()
+	// if err != nil {
+	// 	err = errors.WithMessage(err, "getting count")
+	// 	return
+	// }
 
-	members, err := r.client.SPopN(context.TODO(), "insert_buffer", int64(count)).Result()
+	kvs, err := r.client.HGetAll(context.TODO(), "insert_buffer").Result()
 	if err != nil {
 		err = errors.WithMessage(err, "getting")
 	}
 
-	events = make([]*eventEntities.Event, len(members))
-
+	events = make([]*eventEntities.Event, len(kvs))
+	keys := make([]string, len(kvs))
 	wg := &sync.WaitGroup{}
-	wg.Add(len(members))
+	wg.Add(len(kvs))
 
-	for index, str := range members {
-		go func(i int, encoded string) {
+	index := -1
+	for key, value := range kvs {
+		index++
+		go func(i int, key, encoded string) {
 			defer wg.Done()
 			tmp := &eventEntities.Event{}
 			if e := json.Unmarshal([]byte(encoded), tmp); e != nil {
@@ -79,22 +86,30 @@ func (r *repo) PopAll() (events []*eventEntities.Event, err error) {
 				return
 			}
 			events[i] = tmp
+			keys[i] = key
 
-		}(index, str)
+		}(index, key, value)
 	}
 	wg.Wait()
+
+	if err = r.client.HDel(context.TODO(), "insert_buffer", keys...).Err(); err != nil {
+		err = errors.WithMessage(err, "clearing hash")
+		return
+	}
 
 	return events, nil
 
 }
 func (r *repo) Store(event *eventEntities.Event) (bufferSize uint64, err error) {
-	bts, err := json.Marshal(event)
-	if err != nil {
-		err = errors.WithMessage(err, "marshalling")
-		return
-	}
+	// bts, err := json.Marshal(event)
+	// if err != nil {
+	// 	err = errors.WithMessage(err, "marshalling")
+	// 	return
+	// }
 
-	if err = r.client.SAdd(context.TODO(), "insert_buffer", string(bts)).Err(); err != nil {
+	k, v := getKeyValue(event)
+
+	if err = r.client.HSetNX(context.TODO(), "insert_buffer", k, v).Err(); err != nil {
 		err = errors.WithMessage(err, "inserting")
 		return
 	}

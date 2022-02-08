@@ -12,6 +12,7 @@ type Config struct {
 	PgConnString string
 	Redis        connections.RedisConfig
 	App          events.Config
+	PubSub       connections.RedisPubSubconfig
 }
 
 func GetConfig() *Config {
