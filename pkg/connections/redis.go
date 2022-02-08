@@ -43,5 +43,6 @@ func GetRedisConnection(ctx context.Context, config RedisConfig) (conn *RedisCon
 	}
 
 	conn = &RedisConnection{Connection: client}
+	go conn.connectionChecker(ctx)
 	return conn, nil
 }
