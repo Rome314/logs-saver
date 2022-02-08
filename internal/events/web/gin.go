@@ -32,7 +32,7 @@ func (d *delivery) handleEvent(ctx *gin.Context) {
 
 	input := eventEntities.RawEvent{}
 
-	if err := ctx.ShouldBindJSON(&input); err != nil {
+	if err := ctx.ShouldBind(&input); err != nil {
 
 		logger.WithPlace("read_request").Error(input)
 		ctx.Status(http.StatusBadRequest)

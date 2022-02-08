@@ -5,20 +5,13 @@ import (
 	"time"
 )
 
-// ‘i’ => $ip
-// ‘k’ => $apikey
-// ‘u’ => urlencode($link20_idkb)
-// ‘a’ => $ua
-// ’t’ => $request_time
-// ‘id’ => $user->id
-
 type RawEvent struct {
-	UserId      string `json:"id"`
-	Ip          string `json:"i"`
-	ApiKey      string `json:"k"`
-	Url         string `json:"u"`
-	UserAgent   string `json:"a"`
-	RequestTime int64  `json:"t"`
+	UserId      string `json:"id" form:"id"`
+	Ip          string `json:"i" form:"i"`
+	ApiKey      string `json:"k" form:"k"`
+	Url         string `json:"u" form:"u"`
+	UserAgent   string `json:"a" form:"a"`
+	RequestTime int64  `json:"t" form:"t"`
 }
 
 type Event struct {
