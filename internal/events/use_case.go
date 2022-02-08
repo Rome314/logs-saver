@@ -11,7 +11,7 @@ import (
 	"github.com/rome314/idkb-events/pkg/logging"
 )
 
-const numWorkers = 5
+const numWorkers = 1
 
 type uc struct {
 	logger     *logging.Entry
