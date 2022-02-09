@@ -9,15 +9,23 @@ import (
 	eventEntities "github.com/rome314/idkb-events/internal/events/entities"
 )
 
-func hash(input string) string {
+func hash(values ...string) string {
 	h := md5.New()
-	h.Write([]byte(input))
+	for _, v := range values {
+		h.Write([]byte(v))
+	}
 	return hex.EncodeToString(h.Sum(nil))
 }
 
 func getKeyValue(event *eventEntities.Event) (key string, value string) {
-	key = fmt.Sprintf("%s_%s_%s_%d", event.ApiKey, event.Ip.String(), event.UserId, event.RequestTime.UnixMicro())
-	key = hash(key)
+	key = hash(
+		event.Url,
+		event.UserId,
+		event.Ip.String(),
+		event.ApiKey,
+		event.UserAgent,
+		fmt.Sprintf("%d", event.RequestTime.Unix()),
+	)
 	bts, _ := json.Marshal(event)
 	value = string(bts)
 	return

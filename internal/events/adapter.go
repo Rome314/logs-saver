@@ -3,6 +3,7 @@ package events
 import (
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,9 +51,9 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 		return
 	}
 
-	requestTime := time.UnixMicro(input.RequestTime)
-	if requestTime.IsZero() {
-		err = errors.New("invalid request time provided")
+	requestTime, err := parseTime(input.RequestTime)
+	if err != nil {
+		err = errors.WithMessage(err, "invalid request time provided")
 		return
 	}
 
@@ -65,4 +66,29 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 		RequestTime: requestTime,
 	}
 	return event, nil
+}
+
+func parseTime(timestamp int64) (time.Time, error) {
+	if timestamp <= 0 {
+		return time.Time{}, errors.New("less or equal 0")
+	}
+
+	digits := getDigitsCount(timestamp)
+	trinaries := digits / 3
+
+	switch trinaries {
+	case 3:
+		return time.Unix(timestamp, 0), nil
+	case 4:
+		return time.UnixMilli(timestamp), nil
+	case 5:
+		return time.UnixMicro(timestamp), nil
+	case 6:
+		return time.Unix(0, timestamp), nil
+	default:
+		return time.Time{}, errors.New("not enough precision")
+	}
+}
+func getDigitsCount(n int64) int {
+	return len(strconv.Itoa(int(n)))
 }
