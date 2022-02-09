@@ -6,12 +6,12 @@ import (
 )
 
 type RawEvent struct {
-	UserId      string `json:"id" form:"id"`
-	Ip          string `json:"i" form:"i"`
-	ApiKey      string `json:"k" form:"k"`
-	Url         string `json:"u" form:"u"`
-	UserAgent   string `json:"a" form:"a"`
-	RequestTime int64  `json:"t" form:"t"`
+	UserId      string  `json:"id" form:"id"`
+	Ip          string  `json:"i" form:"i"`
+	ApiKey      string  `json:"k" form:"k"`
+	Url         string  `json:"u" form:"u"`
+	UserAgent   string  `json:"a" form:"a"`
+	RequestTime float64 `json:"t" form:"t"`
 }
 
 type Event struct {

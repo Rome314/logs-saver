@@ -51,7 +51,13 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 		return
 	}
 
-	requestTime, err := parseTime(input.RequestTime)
+	// timestamp, err := strconv.ParseFloat(input.RequestTime, 64)
+	// if err != nil {
+	// 	err = errors.WithMessage(err, "invalid request time provided")
+	// 	return
+	// }
+
+	requestTime, err := parseTime(int64(input.RequestTime))
 	if err != nil {
 		err = errors.WithMessage(err, "invalid request time provided")
 		return
