@@ -1,6 +1,9 @@
 package events_postgres_repository
 
 import (
+	"fmt"
+	"strings"
+
 	"emperror.dev/errors"
 	"github.com/jmoiron/sqlx"
 	eventEntities "github.com/rome314/idkb-events/internal/events/entities"
@@ -57,8 +60,21 @@ func (r *repo) Store(event *eventEntities.Event) (err error) {
 
 	return nil
 }
-func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err error) {
+
+func (r *repo) tmp(events ...*eventEntities.Event) (inserted int64, err error) {
 	// logger := r.logger.WithMethod("StoreMany")
+	tx, err := r.client.Beginx()
+	if err != nil {
+		err = errors.WithMessage(err, "creating tx")
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(PreInsertQueries)
+	if err != nil {
+		err = errors.WithMessage(err, "running pre insert queries")
+		return
+	}
 
 	query := `
         insert into visits(api_key, account, ip, url, ua, time)
@@ -84,17 +100,67 @@ func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err er
 				end ,
 				insert_visits_url_if_not_exist(:url),
 				insert_visits_ua_if_not_exist(:user_agent),
-				:request_time)`
-
+				:request_time);`
 	eventsSql := eventToSqlMany(events...)
 
-	res, err := r.client.NamedExec(query, eventsSql)
+	res, err := tx.NamedExec(query, eventsSql)
 	if err != nil {
-		err = errors.WithMessage(err, "executing query")
+		err = errors.WithMessage(err, "executing inserts")
+		return
+	}
+
+	_, err = tx.Exec(PostInsertQueries)
+	if err != nil {
+		err = errors.WithMessage(err, "running post insert queries")
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		err = errors.WithMessage(err, "committing tx")
 		return
 	}
 	inserted, _ = res.RowsAffected()
 
 	return inserted, nil
 
+}
+
+func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err error) {
+	// logger := r.logger.WithMethod("StoreMany")
+	tx, err := r.client.Beginx()
+	if err != nil {
+		err = errors.WithMessage(err, "creating tx")
+		return
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(PreInsertQueries)
+	if err != nil {
+		err = errors.WithMessage(err, "running pre insert queries")
+		return
+	}
+
+	values := getQueryValueMany(events)
+	query := fmt.Sprintf(`insert into visits(api_key, account, ip, url, ua, time)
+		VALUES %s;`, strings.Join(values, ","))
+
+	res, err := tx.Exec(query)
+	if err != nil {
+		err = errors.WithMessage(err, "executing inserts")
+		return
+	}
+
+	_, err = tx.Exec(PostInsertQueries)
+	if err != nil {
+		err = errors.WithMessage(err, "running post insert queries")
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		err = errors.WithMessage(err, "committing tx")
+		return
+	}
+	inserted, _ = res.RowsAffected()
+
+	return inserted, nil
 }

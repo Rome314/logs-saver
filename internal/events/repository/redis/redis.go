@@ -50,7 +50,7 @@ func (r *repo) StoreToErrorStorage(events []*eventEntities.Event) (err error) {
 }
 
 func (r *repo) Count() (count uint64, err error) {
-	count, err = r.client.HLen(context.TODO(), "insert_buffer").Uint64()
+	count, err = r.client.HLen(context.TODO(), "insert_buffer_test").Uint64()
 	if err != nil {
 		err = errors.WithMessage(err, "getting count")
 		return
@@ -65,7 +65,7 @@ func (r *repo) PopAll() (events []*eventEntities.Event, err error) {
 	// 	return
 	// }
 
-	kvs, err := r.client.HGetAll(context.TODO(), "insert_buffer").Result()
+	kvs, err := r.client.HGetAll(context.TODO(), "insert_buffer_test").Result()
 	if err != nil {
 		err = errors.WithMessage(err, "getting")
 	}
@@ -92,7 +92,7 @@ func (r *repo) PopAll() (events []*eventEntities.Event, err error) {
 	}
 	wg.Wait()
 
-	if err = r.client.HDel(context.TODO(), "insert_buffer", keys...).Err(); err != nil {
+	if err = r.client.HDel(context.TODO(), "insert_buffer_test", keys...).Err(); err != nil {
 		err = errors.WithMessage(err, "clearing hash")
 		return
 	}
@@ -109,7 +109,7 @@ func (r *repo) Store(event *eventEntities.Event) (bufferSize uint64, err error) 
 
 	k, v := getKeyValue(event)
 
-	if err = r.client.HSetNX(context.TODO(), "insert_buffer", k, v).Err(); err != nil {
+	if err = r.client.HSetNX(context.TODO(), "insert_buffer_test", k, v).Err(); err != nil {
 		err = errors.WithMessage(err, "inserting")
 		return
 	}

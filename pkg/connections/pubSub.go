@@ -38,7 +38,7 @@ func GetRedisPubSub(ctx context.Context, client redis.UniversalClient, cfg Redis
 		ctx,
 		redisPubSub.PublisherConfig{
 			Maxlens: map[string]int64{
-				"events": 2000000,
+				"events": 50000,
 			},
 		},
 		client,

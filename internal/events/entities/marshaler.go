@@ -12,7 +12,7 @@ type RedisMarshaller struct {
 
 func (r RedisMarshaller) Marshal(topic string, msg *message.Message) (resp map[string]interface{}, err error) {
 	switch topic {
-	case EventsTopic:
+	case EventsTopic, "events_test":
 		resp = map[string]interface{}{
 			"key":  msg.UUID,
 			"data": string(msg.Payload),

@@ -2,10 +2,77 @@ package events_postgres_repository
 
 import (
 	"database/sql"
+	"fmt"
 	"sync"
 
 	eventEntities "github.com/rome314/idkb-events/internal/events/entities"
 )
+
+func getQueryValueMany(events []*eventEntities.Event) []string {
+	count := len(events)
+
+	resp := make([]string, count)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(count)
+
+	for i, e := range events {
+		go func(index int, event *eventEntities.Event) {
+			defer wg.Done()
+			resp[index] = getQueryValue(event)
+		}(i, e)
+	}
+	wg.Wait()
+	return resp
+}
+
+func getQueryValue(event *eventEntities.Event) string {
+	ipInfo := event.IpInfo
+	return fmt.Sprintf(
+		`(
+		        insert_visits_api_keys_if_not_exist('%s'),
+        		insert_visits_account_if_not_exist(
+                		'%s',
+                		insert_visits_api_keys_if_not_exist('%s')),
+		        case 
+		            when %d != 0 
+					then %d 
+		            else 
+						insert_visits_ip_if_not_exist(
+								'%s',
+								%t,
+								%t,
+								%t,
+								%t,
+								%t, 
+						    	'%s',
+								'%s',
+						    	false)
+				end ,
+				insert_visits_url_if_not_exist('%s'),
+				insert_visits_ua_if_not_exist('%s'),
+				TO_TIMESTAMP('%s','YYYY-MM-DD HH24:MI:SS.US'))`,
+		event.ApiKey,
+		event.UserId,
+		event.ApiKey,
+		event.IpInfo.Id,
+		event.IpInfo.Id,
+		event.Ip.String(),
+		ipInfo.Bot,
+		ipInfo.Datacenter,
+		ipInfo.Tor,
+		ipInfo.Proxy,
+		ipInfo.Vpn,
+		ipInfo.Country,
+		ipInfo.DomainCount,
+		// ipInfo.DomainList,
+		event.Url,
+		event.UserAgent,
+		// 2019-03-06 20:18:41.000001
+		event.RequestTime.Format("2006-01-02 15:04:05.000000"),
+	)
+
+}
 
 type ipInfoSql struct {
 	Id          sql.NullInt32  `db:"id"`
