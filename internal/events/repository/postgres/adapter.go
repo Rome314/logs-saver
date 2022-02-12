@@ -3,6 +3,7 @@ package events_postgres_repository
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 
 	eventEntities "github.com/rome314/idkb-events/internal/events/entities"
@@ -24,6 +25,13 @@ func getQueryValueMany(events []*eventEntities.Event) []string {
 	}
 	wg.Wait()
 	return resp
+}
+
+func sanitize(event *eventEntities.Event) {
+	event.Url = strings.ReplaceAll(event.Url, "'", `"`)
+	event.ApiKey = strings.ReplaceAll(event.ApiKey, "'", `"`)
+	event.UserId = strings.ReplaceAll(event.UserId, "'", `"`)
+	event.UserAgent = strings.ReplaceAll(event.UserAgent, "'", `"`)
 }
 
 func getQueryValue(event *eventEntities.Event) string {
