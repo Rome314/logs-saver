@@ -35,6 +35,7 @@ func sanitize(event *eventEntities.Event) {
 }
 
 func getQueryValue(event *eventEntities.Event) string {
+	sanitize(event)
 	ipInfo := event.IpInfo
 	return fmt.Sprintf(
 		`(
