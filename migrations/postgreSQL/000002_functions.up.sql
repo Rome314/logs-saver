@@ -33,35 +33,7 @@ end;
 $$;
 
 -- IP
-create or replace function insert_visits_ip_if_not_exist(input_address text,
-                                                         input_bot boolean,
-                                                         input_data_center boolean,
-                                                         input_tor boolean,
-                                                         input_proxy boolean,
-                                                         input_vpn boolean,
-                                                         input_country text,
-                                                         input_domain_count text,
-                                                         input_domain_list boolean
-)
-    returns int
-    language plpgsql
-as
-$$
-declare
-    ip_id integer;
-begin
-    select id from visits_ip where address = input_address::inet into ip_id;
-    if ip_id IS NULL then
-        insert into visits_ip (address, bot, data_center, tor, proxy, vpn, country, domain_count, domain_list)
-        values (input_address::inet, input_bot, input_data_center, input_tor, input_proxy, input_vpn, input_country,
-                input_domain_count, input_domain_list)
-        returning id into ip_id;
-    end if;
-    return ip_id;
-
-
-end;
-$$;
+]
 
 -- API_KEY
 
@@ -100,3 +72,34 @@ begin
 
 end;
 $$;
+
+-- DEVICE
+create or replace function insert_visits_device_if_not_exist(input_user text, input_ua text, input_key text,
+                                                             input_type smallint, input_time timestamp) returns integer
+    language plpgsql
+as
+$$
+declare
+    device_id  integer;
+    account_id integer;
+    ua_id      integer;
+    key_id     integer;
+
+begin
+
+    select * from insert_visits_api_keys_if_not_exist(input_key) into key_id;
+    select * from insert_visits_ua_if_not_exist(input_ua) into ua_id;
+    select * from insert_visits_account_if_not_exist(input_user, key_id) into account_id;
+
+    select id from visits_devices where ua = ua_id and key = key_id and type = input_type into device_id;
+    if device_id IS NULL then
+        insert into visits_devices(account_id, type, key, ua, created)
+        values (account_id, input_type, key_id, ua_id, input_time)
+        returning id into device_id;
+    end if;
+    return device_id;
+
+end;
+$$;
+
+

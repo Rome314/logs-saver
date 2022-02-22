@@ -11,8 +11,6 @@ alter table visits
     drop constraint visits_ua_fk;`
 
 const PostInsertQueries = `
-
-	
 	alter table visits_accounts
 	    add constraint visits_accounts_api_key_fk foreign key (api_key) references visits_api_keys;
 	

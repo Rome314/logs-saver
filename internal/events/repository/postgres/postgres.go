@@ -24,105 +24,16 @@ func NewPostgres(logger *logging.Entry, client *sqlx.DB) eventEntities.Repositor
 }
 
 func (r *repo) Store(event *eventEntities.Event) (err error) {
-	query := `
-        insert into visits(api_key, account, ip, url, ua, time)
-		VALUES (
-		        insert_visits_api_keys_if_not_exist(:api_key),
-        		insert_visits_account_if_not_exist(
-                		:user_id,
-                		insert_visits_api_keys_if_not_exist(:api_key)),
-		        case 
-		            when :ip_info.id != 0 
-					then :ip_info.id 
-		            else 
-						insert_visits_ip_if_not_exist(
-								:ip,
-								:ip_info.bot,
-								:ip_info.data_center,
-								:ip_info.tor,
-								:ip_info.proxy,
-								:ip_info.vpn, 
-						    	:ip_info.country,
-								:ip_info.domain_count,
-						    	:ip_info.domain_list)
-				end ,
-				insert_visits_url_if_not_exist(:url),
-				insert_visits_ua_if_not_exist(:user_agent),
-				:request_time)`
+	query := fmt.Sprintf(`insert into visits(api_key, account, ip, url, ua, time)
+		VALUES %s;`, GetQueryValue(event))
 
-	tmp := eventToSql(event)
-
-	_, err = r.client.NamedExec(query, tmp)
+	_, err = r.client.Exec(query)
 	if err != nil {
 		err = errors.WithMessage(err, "executing query")
 		return
 	}
 
 	return nil
-}
-
-func (r *repo) tmp(events ...*eventEntities.Event) (inserted int64, err error) {
-	// logger := r.logger.WithMethod("StoreMany")
-	tx, err := r.client.Beginx()
-	if err != nil {
-		err = errors.WithMessage(err, "creating tx")
-		return
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec(PreInsertQueries)
-	if err != nil {
-		err = errors.WithMessage(err, "running pre insert queries")
-		return
-	}
-
-	query := `
-        insert into visits(api_key, account, ip, url, ua, time)
-		VALUES (
-		        insert_visits_api_keys_if_not_exist(:api_key),
-        		insert_visits_account_if_not_exist(
-                		:user_id,
-                		insert_visits_api_keys_if_not_exist(:api_key)),
-		        case 
-		            when :ip_info.id != 0 
-					then :ip_info.id 
-		            else 
-						insert_visits_ip_if_not_exist(
-								:ip,
-								:ip_info.bot,
-								:ip_info.data_center,
-								:ip_info.tor,
-								:ip_info.proxy,
-								:ip_info.vpn, 
-						    	:ip_info.country,
-								:ip_info.domain_count,
-						    	:ip_info.domain_list)
-				end ,
-				insert_visits_url_if_not_exist(:url),
-				insert_visits_ua_if_not_exist(:user_agent),
-				:request_time);`
-	eventsSql := eventToSqlMany(events...)
-
-	res, err := tx.NamedExec(query, eventsSql)
-	if err != nil {
-		err = errors.WithMessage(err, "executing inserts")
-		return
-	}
-
-	_, err = tx.Exec(PostInsertQueries)
-	if err != nil {
-		err = errors.WithMessage(err, "running post insert queries")
-		return
-	}
-
-	if err = tx.Commit(); err != nil {
-		err = errors.WithMessage(err, "committing tx")
-		return
-	}
-	inserted, _ = res.RowsAffected()
-
-	return inserted, nil
-
 }
 
 func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err error) {
@@ -140,7 +51,7 @@ func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err er
 		return
 	}
 
-	values := getQueryValueMany(events)
+	values := GetQueryValueMany(events)
 	query := fmt.Sprintf(`insert into visits(api_key, account, ip, url, ua, time)
 		VALUES %s;`, strings.Join(values, ","))
 

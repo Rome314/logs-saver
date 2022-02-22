@@ -23,7 +23,7 @@ func getKeyValue(event *eventEntities.Event) (key string, value string) {
 		event.UserId,
 		event.Ip.String(),
 		event.ApiKey,
-		event.UserAgent,
+		event.Device.UserAgent,
 		fmt.Sprintf("%d", event.RequestTime.Unix()),
 	)
 	bts, _ := json.Marshal(event)

@@ -1,4 +1,5 @@
-create table visits_ip
+-- IP
+create table if not exists visits_ip
 (
     id           serial
         constraint visits_ip_pk
@@ -10,8 +11,7 @@ create table visits_ip
     proxy        boolean not null,
     vpn          boolean not null,
     country      text    not null,
-    domain_count text,
-    domain_list  boolean not null
+    domain_list  text[] default '{}'::text[]
 );
 
 comment on table visits_ip is 'Conaints ip information';
@@ -21,14 +21,16 @@ alter table visits_ip
 
 grant select on sequence visits_ip_id_seq to postgrest_test;
 
-create unique index visits_ip_address_uindex
+create unique index if not exists visits_ip_address_uindex
     on visits_ip (address);
 
-create unique index visits_ip_id_uindex
+create unique index if not exists visits_ip_id_uindex
     on visits_ip (id);
 
 grant select on visits_ip to postgrest_test;
 
+
+-- URL
 create table visits_url
 (
     id  serial
@@ -51,7 +53,7 @@ create unique index visits_url_id_uindex
     on visits_url (id);
 
 grant select on visits_url to postgrest_test;
-
+-- USER_AGENT
 create table visits_ua
 (
     id serial
@@ -74,6 +76,8 @@ create unique index visits_ua_id_uindex
     on visits_ua (id);
 
 grant select on visits_ua to postgrest_test;
+
+-- API_KEYS
 
 create table visits_api_keys
 (
@@ -98,6 +102,8 @@ create unique index visits_api_keys_key_uindex
     on visits_api_keys (key);
 
 grant select on visits_api_keys to postgrest_test;
+
+-- ACCOUNTS
 
 create table visits_accounts
 (
@@ -129,6 +135,41 @@ create unique index visits_accounts_user_id_uindex
 
 grant select on visits_accounts to postgrest_test;
 
+-- DEVICES
+
+create table visits_devices
+(
+    id         bigserial
+        constraint visits_devices_pk
+            primary key,
+    account_id integer                                                not null
+        constraint visits_devices_account__fk
+            references visits_accounts,
+    type       smallint  default 1                                    not null,
+    key        smallint                                               not null
+        constraint visits_devices_api_key_fk
+            references visits_api_keys,
+    ua         integer                                                not null
+        constraint visits_devices_ua_fk
+            references visits_ua,
+    created    timestamp default (now())::timestamp without time zone not null
+);
+
+alter table visits_devices
+    owner to u6lhrq6rcqa0bd;
+
+grant select on sequence visits_devices_id_seq to postgrest_test;
+
+create unique index visits_devices_id_uindex
+    on visits_devices (id);
+
+create unique index visits_devices_uniq_index
+    on visits_devices (account_id, key, ua);
+
+grant select on visits_devices to postgrest_test;
+
+-- VISITS
+
 create table visits
 (
     id      bigserial
@@ -146,9 +187,9 @@ create table visits
     url     integer   not null
         constraint visits_url_fk
             references visits_url,
-    ua      integer   not null
+    device  bigint    not null
         constraint visits_ua_fk
-            references visits_ua,
+            references visits_devices,
     time    timestamp not null
 );
 
@@ -157,8 +198,7 @@ alter table visits
 
 grant select on sequence visits_id_seq to postgrest_test;
 
-create unique index visits_id_uindex
-    on visits (id);
-
 grant select on visits to postgrest_test;
+
+
 
