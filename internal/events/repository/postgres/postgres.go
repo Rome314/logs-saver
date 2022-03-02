@@ -36,6 +36,7 @@ func (r *repo) Store(event *eventEntities.Event) (err error) {
 	return nil
 }
 
+// TODO: update queries for new version(every table and function contains api_key field)
 func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err error) {
 	// logger := r.logger.WithMethod("StoreMany")
 	tx, err := r.client.Beginx()
