@@ -19,7 +19,6 @@ func (r *repo) SetIpInfo(ip string, info *eventEntities.IpInfo) (id int32, err e
 								:ip_info.proxy,
 								:ip_info.vpn, 
 						    	:ip_info.country,
-								:ip_info.domain_count,
 						    	:ip_info.domain_list);`
 
 	toInsert := struct {

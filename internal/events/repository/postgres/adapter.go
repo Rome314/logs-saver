@@ -1,11 +1,13 @@
 package events_postgres_repository
 
 import (
+	"database/sql"
 	"fmt"
 	"strings"
 	"sync"
 
 	eventEntities "github.com/rome314/idkb-events/internal/events/entities"
+	log "github.com/sirupsen/logrus"
 )
 
 func GetQueryValueMany(events []*eventEntities.Event) []string {
@@ -19,6 +21,10 @@ func GetQueryValueMany(events []*eventEntities.Event) []string {
 	for i, e := range events {
 		go func(index int, event *eventEntities.Event) {
 			defer wg.Done()
+			if event == nil {
+				log.Warn("nil event")
+				return
+			}
 			resp[index] = GetQueryValue(event)
 		}(i, e)
 	}
@@ -36,7 +42,7 @@ func sanitize(event *eventEntities.Event) {
 func GetQueryValue(event *eventEntities.Event) string {
 	sanitize(event)
 	ipInfo := event.IpInfo
-	return fmt.Sprintf(
+	value := fmt.Sprintf(
 		`(
 		        insert_visits_api_keys_if_not_exist('%s'),
         		insert_visits_account_if_not_exist(
@@ -54,10 +60,10 @@ func GetQueryValue(event *eventEntities.Event) string {
 								%t,
 								%t, 
 						    	'%s',
-								{%s})
+								'{%s}'::text[])
 				end ,
 				insert_visits_url_if_not_exist('%s'),
-				insert_visits_device_if_not_exist(%s,%s,%s,%d,TO_TIMESTAMP('%s','YYYY-MM-DD HH24:MI:SS.US')),
+				insert_visits_device_if_not_exist('%s'::text,'%s'::text,'%s'::text,%d::smallint,TO_TIMESTAMP('%s','YYYY-MM-DD HH24:MI:SS.US')::timestamp),
 				TO_TIMESTAMP('%s','YYYY-MM-DD HH24:MI:SS.US'))`,
 		event.ApiKey,
 		event.UserId,
@@ -80,5 +86,44 @@ func GetQueryValue(event *eventEntities.Event) string {
 		event.RequestTime.Format("2006-01-02 15:04:05.000000"),
 		event.RequestTime.Format("2006-01-02 15:04:05.000000"),
 	)
+	return value
+}
 
+type ipInfoSql struct {
+	Id          sql.NullInt32  `db:"id"`
+	Bot         sql.NullBool   `db:"bot"`
+	Datacenter  sql.NullBool   `db:"data_center"`
+	Tor         sql.NullBool   `db:"tor"`
+	Proxy       sql.NullBool   `db:"proxy"`
+	Vpn         sql.NullBool   `db:"vpn"`
+	Country     sql.NullString `db:"country"`
+	DomainCount sql.NullString `db:"domain_count"`
+	DomainList  []string       `db:"domain_list"`
+	Address     sql.NullString `db:"address"`
+}
+
+func (i ipInfoSql) ToIpInfo() *eventEntities.IpInfo {
+	return &eventEntities.IpInfo{
+		Id:         i.Id.Int32,
+		Bot:        i.Bot.Bool,
+		Datacenter: i.Datacenter.Bool,
+		Tor:        i.Tor.Bool,
+		Proxy:      i.Proxy.Bool,
+		Vpn:        i.Vpn.Bool,
+		Country:    i.Country.String,
+		DomainList: i.DomainList,
+	}
+}
+
+func ipInfoToSql(input *eventEntities.IpInfo) ipInfoSql {
+	return ipInfoSql{
+		Id:         sql.NullInt32{input.Id, true},
+		Bot:        sql.NullBool{input.Bot, true},
+		Datacenter: sql.NullBool{input.Datacenter, true},
+		Tor:        sql.NullBool{input.Tor, true},
+		Proxy:      sql.NullBool{input.Proxy, true},
+		Vpn:        sql.NullBool{input.Vpn, true},
+		Country:    sql.NullString{input.Country, true},
+		DomainList: input.DomainList,
+	}
 }

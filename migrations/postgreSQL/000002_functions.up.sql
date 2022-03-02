@@ -1,5 +1,5 @@
 -- URL
-create or replace function insert_visits_url_if_not_exist(input_url text)
+create or replace function insert_visits_url_if_not_exist(input_url text, api_key_id smallint)
     returns int
     language plpgsql
 as
@@ -9,13 +9,13 @@ declare
 begin
     select id from visits_url where url = input_url into ua_id;
     if ua_id IS NULL then
-        insert into visits_url (url) values (input_url) returning id into ua_id;
+        insert into visits_url (url, api_key) values (input_url, api_key_id) returning id into ua_id;
     end if;
     return ua_id;
 end;
 $$;
 -- USER_AGENT
-create or replace function insert_visits_ua_if_not_exist(input_ua text)
+create or replace function insert_visits_ua_if_not_exist(input_ua text, api_key_id smallint)
     returns int
     language plpgsql
 as
@@ -25,7 +25,7 @@ declare
 begin
     select id from visits_ua where ua = input_ua into ua_id;
     if ua_id IS NULL then
-        insert into visits_ua (ua) values (input_ua) returning id into ua_id;
+        insert into visits_ua (ua, api_key) values (input_ua, api_key_id) returning id into ua_id;
     end if;
     return ua_id;
 
@@ -33,7 +33,34 @@ end;
 $$;
 
 -- IP
-]
+create or replace function insert_visits_ip_if_not_exist(input_address text,
+                                                         input_bot boolean,
+                                                         input_data_center boolean,
+                                                         input_tor boolean,
+                                                         input_proxy boolean,
+                                                         input_vpn boolean,
+                                                         input_country text,
+                                                         input_domain_list text[], api_key_id smallint
+)
+    returns int
+    language plpgsql
+as
+$$
+declare
+    ip_id integer;
+begin
+    select id from visits_ip where address = input_address::inet into ip_id;
+    if ip_id IS NULL then
+        insert into visits_ip (address, bot, data_center, tor, proxy, vpn, country, domain_list, api_key)
+        values (input_address::inet, input_bot, input_data_center, input_tor, input_proxy, input_vpn, input_country,
+                input_domain_list, api_key_id)
+        returning id into ip_id;
+    end if;
+    return ip_id;
+
+
+end;
+$$;
 
 -- API_KEY
 
@@ -56,7 +83,7 @@ end;
 $$;
 
 -- ACCOUNT
-create or replace function insert_visits_account_if_not_exist(input_user_id text, input_api_key integer)
+create or replace function insert_visits_account_if_not_exist(input_user_id text, api_key_id smallint)
     returns int
     language plpgsql
 as
@@ -66,7 +93,7 @@ declare
 begin
     select id from visits_accounts where user_id = input_user_id into acc_id;
     if acc_id IS NULL then
-        insert into visits_accounts (user_id, api_key) values (input_user_id, input_api_key) returning id into acc_id;
+        insert into visits_accounts (user_id, api_key) values (input_user_id, api_key_id) returning id into acc_id;
     end if;
     return acc_id;
 
@@ -74,8 +101,10 @@ end;
 $$;
 
 -- DEVICE
-create or replace function insert_visits_device_if_not_exist(input_user text, input_ua text, input_key text,
-                                                             input_type smallint, input_time timestamp) returns integer
+
+create or replace function insert_visits_device_if_not_exist(input_user text, input_ua text,
+                                                             input_type smallint,
+                                                             input_time timestamp, api_key_id smallint) returns integer
     language plpgsql
 as
 $$
@@ -83,23 +112,19 @@ declare
     device_id  integer;
     account_id integer;
     ua_id      integer;
-    key_id     integer;
 
 begin
 
-    select * from insert_visits_api_keys_if_not_exist(input_key) into key_id;
     select * from insert_visits_ua_if_not_exist(input_ua) into ua_id;
-    select * from insert_visits_account_if_not_exist(input_user, key_id) into account_id;
+    select * from insert_visits_account_if_not_exist(input_user, api_key_id) into account_id;
 
-    select id from visits_devices where ua = ua_id and key = key_id and type = input_type into device_id;
+    select id from visits_devices where ua = ua_id and api_key = api_key_id and type = input_type into device_id;
     if device_id IS NULL then
-        insert into visits_devices(account_id, type, key, ua, created)
-        values (account_id, input_type, key_id, ua_id, input_time)
+        insert into visits_devices(account_id, type, api_key, ua, created)
+        values (account_id, input_type, api_key_id, ua_id, input_time)
         returning id into device_id;
     end if;
     return device_id;
 
 end;
 $$;
-
-

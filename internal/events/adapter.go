@@ -9,6 +9,7 @@ import (
 
 	"emperror.dev/errors"
 	eventEntities "github.com/rome314/idkb-events/internal/events/entities"
+	"github.com/rome314/idkb-events/pkg/userAgentParser"
 )
 
 func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err error) {
@@ -25,6 +26,18 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 	if input.UserAgent == "" {
 		err = errors.New("user agent not provided")
 		return
+	}
+	parsedUa := userAgentParser.Parse(input.UserAgent)
+	var deviceType int
+	switch parsedUa.DeviceType {
+	case userAgentParser.DesktopDevice, userAgentParser.SmartTVDevice:
+		break
+	case userAgentParser.PhoneDevice:
+		deviceType = 1
+		break
+	case userAgentParser.TabletDevice:
+		deviceType = 2
+		break
 	}
 
 	decodedUrl, err := url.QueryUnescape(input.Url)
@@ -51,12 +64,6 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 		return
 	}
 
-	// timestamp, err := strconv.ParseFloat(input.RequestTime, 64)
-	// if err != nil {
-	// 	err = errors.WithMessage(err, "invalid request time provided")
-	// 	return
-	// }
-
 	requestTime, err := parseTime(int64(input.RequestTime))
 	if err != nil {
 		err = errors.WithMessage(err, "invalid request time provided")
@@ -64,11 +71,14 @@ func RawToEvent(input eventEntities.RawEvent) (event *eventEntities.Event, err e
 	}
 
 	event = &eventEntities.Event{
-		Url:         u.String(),
-		UserId:      input.UserId,
-		Ip:          ip,
-		ApiKey:      input.ApiKey,
-		UserAgent:   input.UserAgent,
+		Url:    u.String(),
+		UserId: input.UserId,
+		Ip:     ip,
+		ApiKey: input.ApiKey,
+		Device: eventEntities.Device{
+			Type:      deviceType,
+			UserAgent: input.UserAgent,
+		},
 		RequestTime: requestTime,
 	}
 	return event, nil

@@ -24,8 +24,8 @@ func NewPostgres(logger *logging.Entry, client *sqlx.DB) eventEntities.Repositor
 }
 
 func (r *repo) Store(event *eventEntities.Event) (err error) {
-	query := fmt.Sprintf(`insert into visits(api_key, account, ip, url, ua, time)
-		VALUES %s;`, GetQueryValue(event))
+	return errors.NewPlain("not implemented")
+	query := fmt.Sprintf(InsertQuery, GetQueryValue(event))
 
 	_, err = r.client.Exec(query)
 	if err != nil {
@@ -52,8 +52,7 @@ func (r *repo) StoreMany(events ...*eventEntities.Event) (inserted int64, err er
 	}
 
 	values := GetQueryValueMany(events)
-	query := fmt.Sprintf(`insert into visits(api_key, account, ip, url, ua, time)
-		VALUES %s;`, strings.Join(values, ","))
+	query := fmt.Sprintf(InsertQuery, strings.Join(values, ","))
 
 	res, err := tx.Exec(query)
 	if err != nil {

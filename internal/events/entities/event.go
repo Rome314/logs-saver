@@ -85,6 +85,7 @@ func (i *IpInfo) UnmarshalJSON(bytes []byte) error {
 }
 
 type Device struct {
+	// 0 - stands for desktop, 1 - mobile, 2 - tablet
 	Type      int    `json:"type"`
 	UserAgent string `json:"user_agent"`
 }
